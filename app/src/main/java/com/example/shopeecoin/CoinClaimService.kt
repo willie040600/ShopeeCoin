@@ -96,11 +96,6 @@ class CoinClaimService : AccessibilityService() {
 
         // Ordered from most to least specific.
         private val KEYWORDS = listOf(
-            "領取蝦幣",
-            "簽到領蝦幣",
-            "今日簽到",
-            "立即領取",
-            "點擊領取",
             "領取",
         )
     }
