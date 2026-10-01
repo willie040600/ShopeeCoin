@@ -1,0 +1,5 @@
+<resources>
+    <string name="app_name">ShopeeCoin</string>
+    <string name="accessibility_service_label">蝦幣自動領取</string>
+    <string name="accessibility_service_description">在蝦皮 App 中偵測「領取蝦幣」「今日簽到」等按鈕並自動點擊。</string>
+</resources>
