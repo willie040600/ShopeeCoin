@@ -2,8 +2,13 @@ package com.example.shopeecoin
 
 import android.accessibilityservice.AccessibilityService
 import android.accessibilityservice.GestureDescription
+import android.graphics.Color
 import android.graphics.Path
+import android.graphics.PixelFormat
 import android.graphics.Rect
+import android.view.Gravity
+import android.view.WindowManager
+import android.widget.TextView
 import android.os.Handler
 import android.os.Looper
 import android.os.SystemClock
@@ -18,8 +23,16 @@ class CoinClaimService : AccessibilityService() {
     private val handler = Handler(Looper.getMainLooper())
     private val scanRunnable = Runnable { scan() }
 
+    private var badge: TextView? = null
+
     override fun onAccessibilityEvent(event: AccessibilityEvent) {
-        if (event.packageName?.toString() !in SHOPEE_PACKAGES) return
+        val pkg = event.packageName?.toString()
+        if (pkg == packageName) return
+        if (pkg !in SHOPEE_PACKAGES) {
+            hideBadge()
+            return
+        }
+        showBadge()
         // Throttle with a trailing scan so the final state after a burst of updates is always checked.
         if (!handler.hasCallbacks(scanRunnable)) handler.postDelayed(scanRunnable, SCAN_DELAY_MS)
     }
@@ -28,7 +41,36 @@ class CoinClaimService : AccessibilityService() {
 
     override fun onDestroy() {
         handler.removeCallbacks(scanRunnable)
+        hideBadge()
         super.onDestroy()
+    }
+
+    private fun showBadge() {
+        if (badge != null) return
+        val view = TextView(this).apply {
+            text = "● 自動點擊已啟用"
+            setTextColor(Color.WHITE)
+            textSize = 12f
+            setBackgroundColor(Color.argb(180, 0, 150, 0))
+            setPadding(24, 8, 24, 8)
+        }
+        val params = WindowManager.LayoutParams(
+            WindowManager.LayoutParams.WRAP_CONTENT,
+            WindowManager.LayoutParams.WRAP_CONTENT,
+            WindowManager.LayoutParams.TYPE_ACCESSIBILITY_OVERLAY,
+            WindowManager.LayoutParams.FLAG_NOT_FOCUSABLE or WindowManager.LayoutParams.FLAG_NOT_TOUCHABLE,
+            PixelFormat.TRANSLUCENT
+        ).apply {
+            gravity = Gravity.TOP or Gravity.CENTER_HORIZONTAL
+            y = 120
+        }
+        getSystemService(WindowManager::class.java).addView(view, params)
+        badge = view
+    }
+
+    private fun hideBadge() {
+        badge?.let { getSystemService(WindowManager::class.java).removeView(it) }
+        badge = null
     }
 
     private fun scan() {
