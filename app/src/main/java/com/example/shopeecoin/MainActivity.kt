@@ -50,7 +50,7 @@ class MainActivity : ComponentActivity() {
                             Text("2. 開啟蝦皮，進入「蝦幣」頁面")
                         }
                         Text(
-                            "啟用後，只要在蝦皮 App 畫面上出現「領取蝦幣」「今日簽到」「立即領取」等按鈕，就會自動點擊。",
+                            "啟用後，只要在蝦皮 App 畫面上出現「領取」按鈕，就會自動點擊。",
                             style = MaterialTheme.typography.bodySmall
                         )
                     }
