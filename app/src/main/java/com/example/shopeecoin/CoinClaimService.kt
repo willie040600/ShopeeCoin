@@ -23,6 +23,7 @@ import android.widget.Toast
 class CoinClaimService : AccessibilityService() {
 
     private var lastClickAt = 0L
+    private var noCoinSince = 0L
     private val handler = Handler(Looper.getMainLooper())
     private val scanRunnable = Runnable { scan() }
 
@@ -35,7 +36,6 @@ class CoinClaimService : AccessibilityService() {
             hideBadge()
             return
         }
-        showBadge()
         // Throttle with a trailing scan so the final state after a burst of updates is always checked.
         if (!handler.hasCallbacks(scanRunnable)) handler.postDelayed(scanRunnable, SCAN_DELAY_MS)
     }
@@ -51,7 +51,7 @@ class CoinClaimService : AccessibilityService() {
     private fun showBadge() {
         if (badge != null) return
         val view = TextView(this).apply {
-            text = "● 自動點擊已啟用"
+            text = "● 已偵測到直播"
             setTextColor(Color.WHITE)
             textSize = 12f
             setBackgroundColor(Color.argb(180, 0, 150, 0))
@@ -77,16 +77,23 @@ class CoinClaimService : AccessibilityService() {
     }
 
     private fun scan() {
+        val roots = windows.mapNotNull { it.root }
+            .ifEmpty { listOfNotNull(rootInActiveWindow) }
+            .filter { it.packageName?.toString() in SHOPEE_PACKAGES }
+        if (isInLiveRoom(roots)) showBadge() else hideBadge()
+
         val sinceLastClick = SystemClock.uptimeMillis() - lastClickAt
         if (sinceLastClick < CLICK_INTERVAL_MS) {
             handler.postDelayed(scanRunnable, CLICK_INTERVAL_MS - sinceLastClick)
             return
         }
 
-        val roots = windows.mapNotNull { it.root }
-            .ifEmpty { listOfNotNull(rootInActiveWindow) }
-            .filter { it.packageName?.toString() in SHOPEE_PACKAGES }
-        val target = roots.firstNotNullOfOrNull(::findClaimButton) ?: return
+        val target = roots.firstNotNullOfOrNull(::findClaimButton)
+        if (target == null) {
+            maybeSwipeUp(roots)
+            return
+        }
+        noCoinSince = 0L
 
         val label = labelOf(target)
         if (clickNode(target)) {
@@ -102,13 +109,64 @@ class CoinClaimService : AccessibilityService() {
         return KEYWORDS.firstNotNullOfOrNull { kw -> matches.firstOrNull { labelOf(it) == kw } }
     }
 
-    private fun inScanRegion(node: AccessibilityNodeInfo): Boolean {
+    private fun inScanRegion(node: AccessibilityNodeInfo, region: RectF = SCAN_REGION): Boolean {
         val m = resources.displayMetrics
         val b = Rect().also(node::getBoundsInScreen)
-        return SCAN_REGION.contains(
+        return region.contains(
             b.exactCenterX() / m.widthPixels,
             b.exactCenterY() / m.heightPixels
         )
+    }
+
+    private fun anyNode(node: AccessibilityNodeInfo, predicate: (AccessibilityNodeInfo) -> Boolean): Boolean {
+        if (predicate(node)) return true
+        for (i in 0 until node.childCount) {
+            if (node.getChild(i)?.let { anyNode(it, predicate) } == true) return true
+        }
+        return false
+    }
+
+    private fun isInLiveRoom(roots: List<AccessibilityNodeInfo>): Boolean =
+        roots.any { root ->
+            anyNode(root) {
+                it.isVisibleToUser && labelOf(it)?.contains(LIVE_ROOM_LABEL) == true && inScanRegion(it, LIVE_ROOM_REGION)
+            }
+        }
+
+    private fun maybeSwipeUp(roots: List<AccessibilityNodeInfo>) {
+        val hasLiveCoin = roots.any { root ->
+            anyNode(root) { it.isVisibleToUser && labelOf(it)?.contains(LIVE_COIN_LABEL) == true && inScanRegion(it) }
+        }
+        if (!isInLiveRoom(roots) || hasLiveCoin) {
+            noCoinSince = 0L
+            return
+        }
+
+        val now = SystemClock.uptimeMillis()
+        if (noCoinSince == 0L) noCoinSince = now
+        val remaining = NO_COIN_WAIT_MS - (now - noCoinSince)
+        if (remaining > 0) {
+            // The screen may stay static, so schedule a recheck instead of waiting for an event.
+            handler.postDelayed(scanRunnable, remaining)
+            return
+        }
+
+        noCoinSince = 0L
+        Log.i(TAG, "No live coin widget for ${NO_COIN_WAIT_MS}ms, swiping up")
+        swipeUp()
+    }
+
+    private fun swipeUp() {
+        val m = resources.displayMetrics
+        val x = m.widthPixels * 0.5f
+        val path = Path().apply {
+            moveTo(x, m.heightPixels * 0.85f)
+            lineTo(x, m.heightPixels * 0.15f)
+        }
+        val gesture = GestureDescription.Builder()
+            .addStroke(GestureDescription.StrokeDescription(path, 0, 250))
+            .build()
+        dispatchGesture(gesture, null, null)
     }
 
 
@@ -145,7 +203,11 @@ class CoinClaimService : AccessibilityService() {
         private const val TAG = "CoinClaimService"
         private const val CLICK_INTERVAL_MS = 5_000L
         private const val SCAN_DELAY_MS = 1000L
+        private const val NO_COIN_WAIT_MS = 3_000L
         private val SCAN_REGION = RectF(0.64f, 0.27f, 1.0f, 0.40f)
+        private val LIVE_ROOM_REGION = RectF(0.64f, 0.0f, 1.0f, 0.25f)
+        private const val LIVE_ROOM_LABEL = "看更多"
+        private const val LIVE_COIN_LABEL = "直播間蝦幣"
 
         val SHOPEE_PACKAGES = setOf("com.shopee.tw")
 
