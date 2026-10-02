@@ -2,10 +2,12 @@ package com.example.shopeecoin
 
 import android.accessibilityservice.AccessibilityService
 import android.accessibilityservice.GestureDescription
+import android.annotation.SuppressLint
 import android.graphics.Color
 import android.graphics.Path
 import android.graphics.PixelFormat
 import android.graphics.Rect
+import android.graphics.RectF
 import android.view.Gravity
 import android.view.WindowManager
 import android.widget.TextView
@@ -17,6 +19,7 @@ import android.view.accessibility.AccessibilityEvent
 import android.view.accessibility.AccessibilityNodeInfo
 import android.widget.Toast
 
+@SuppressLint("AccessibilityPolicy")
 class CoinClaimService : AccessibilityService() {
 
     private var lastClickAt = 0L
@@ -99,9 +102,18 @@ class CoinClaimService : AccessibilityService() {
         return KEYWORDS.firstNotNullOfOrNull { kw -> matches.firstOrNull { labelOf(it) == kw } }
     }
 
+    private fun inScanRegion(node: AccessibilityNodeInfo): Boolean {
+        val m = resources.displayMetrics
+        val b = Rect().also(node::getBoundsInScreen)
+        return SCAN_REGION.contains(
+            b.exactCenterX() / m.widthPixels,
+            b.exactCenterY() / m.heightPixels
+        )
+    }
+
+
     private fun collectMatches(node: AccessibilityNodeInfo, out: MutableList<AccessibilityNodeInfo>) {
-        // Exact label match so "已領取" / "明天可領取" are skipped.
-        if (node.isVisibleToUser && node.isEnabled && labelOf(node) in KEYWORDS) out += node
+        if (node.isVisibleToUser && node.isEnabled && labelOf(node) in KEYWORDS && inScanRegion(node)) out += node
         for (i in 0 until node.childCount) {
             node.getChild(i)?.let { collectMatches(it, out) }
         }
@@ -133,6 +145,7 @@ class CoinClaimService : AccessibilityService() {
         private const val TAG = "CoinClaimService"
         private const val CLICK_INTERVAL_MS = 5_000L
         private const val SCAN_DELAY_MS = 1000L
+        private val SCAN_REGION = RectF(0.64f, 0.27f, 1.0f, 0.40f)
 
         val SHOPEE_PACKAGES = setOf("com.shopee.tw")
 
