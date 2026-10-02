@@ -80,7 +80,12 @@ class CoinClaimService : AccessibilityService() {
         val roots = windows.mapNotNull { it.root }
             .ifEmpty { listOfNotNull(rootInActiveWindow) }
             .filter { it.packageName?.toString() in SHOPEE_PACKAGES }
-        if (isInLiveRoom(roots)) showBadge() else hideBadge()
+        val inLiveRoom = isInLiveRoom(roots)
+        if (inLiveRoom) showBadge() else hideBadge()
+        if (!inLiveRoom) {
+            noCoinSince = 0L
+            return
+        }
 
         val sinceLastClick = SystemClock.uptimeMillis() - lastClickAt
         if (sinceLastClick < CLICK_INTERVAL_MS) {
