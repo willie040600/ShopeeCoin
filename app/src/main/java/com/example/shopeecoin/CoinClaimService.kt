@@ -209,7 +209,7 @@ class CoinClaimService : AccessibilityService() {
         private const val CLICK_INTERVAL_MS = 5_000L
         private const val SCAN_DELAY_MS = 1000L
         private const val NO_COIN_WAIT_MS = 3_000L
-        private val SCAN_REGION = RectF(0.64f, 0.27f, 1.0f, 0.40f)
+        private val SCAN_REGION = RectF(0.64f, 0.27f, 1.0f, 0.5f)
         private val LIVE_ROOM_REGION = RectF(0.64f, 0.0f, 1.0f, 0.25f)
         private const val LIVE_ROOM_LABEL = "看更多"
         private const val LIVE_COIN_LABEL = "直播間蝦幣"
